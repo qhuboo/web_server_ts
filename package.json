@@ -1,0 +1,15 @@
+{
+  "name": "web_server_ts",
+  "version": "1.0.0",
+  "description": "Going through the \"Build Your Own Web Server from Scratch in Node.JS\" book by James Smith.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jose Lopez Renteria",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "typescript": "^5.7.3"
+  }
+}
