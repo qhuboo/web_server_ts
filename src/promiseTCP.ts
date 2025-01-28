@@ -3,7 +3,7 @@ import * as net from "node:net";
 let server = net.createServer({ pauseOnConnect: true });
 
 server.listen({ host: "127.0.0.1", port: 1234 });
-server.on("connection", serveClient);
+server.on("connection", newConn);
 
 type TCPConn = {
   socket: net.Socket;
