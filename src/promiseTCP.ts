@@ -1,4 +1,6 @@
 import * as net from "node:net";
+import { Buffer } from "node:buffer";
+import { DynamicBuffer, bufferPush } from "./dynamicBuffer";
 
 let server = net.createServer({ pauseOnConnect: true });
 
@@ -101,15 +103,46 @@ async function newConn(socket: net.Socket): Promise<void> {
 
 async function serveClient(socket: net.Socket): Promise<void> {
   const conn: TCPConn = socketInit(socket);
+  const buffer: DynamicBuffer = { data: Buffer.alloc(0), length: 0 };
 
   while (true) {
-    const data = await socketRead(conn);
-    if (data.length === 0) {
-      console.log("end connection");
-      break;
-    }
+    // Try to get 1 message from the buffer
+    const msg: null | Buffer = cutMessage(buffer);
+    if (!msg) {
+      const data: Buffer = await socketRead(conn);
+      bufferPush(buffer, data);
 
-    console.log("data", data);
-    await socketWrite(conn, data);
+      if (data.length === 0) {
+        console.log("end connection");
+        break;
+      }
+    } else if (msg.equals(Buffer.from("quit\n"))) {
+      await socketWrite(conn, Buffer.from("Bye.\n"));
+      socket.destroy();
+      return;
+    } else {
+      const reply = Buffer.concat([Buffer.from("Echo: "), msg]);
+      await socketWrite(conn, reply);
+    }
   }
+}
+
+function cutMessage(buffer: DynamicBuffer): null | Buffer {
+  // messages are separated by '\n'
+  const idx = buffer.data.subarray(0, buffer.length).indexOf("\n");
+  if (idx < 0) {
+    return null;
+  }
+
+  // Make a copy of the message and move the remaining data to the front
+  const msg: Buffer = Buffer.from(buffer.data.subarray(0, idx + 1));
+  bufferPop(buffer, idx + 1);
+  return msg;
+}
+
+function bufferPop(buffer: DynamicBuffer, length: number): void {
+  // Move the remaining data to the front
+  buffer.data.copyWithin(0, length, buffer.length);
+  // Set the new buffer data length by subtracting the length of the message
+  buffer.length -= length;
 }

@@ -25,3 +25,4 @@ function onConnection(socket: net.Socket): void {
     console.log("EOF.");
   });
 }
+3;
