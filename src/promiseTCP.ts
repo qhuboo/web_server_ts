@@ -32,7 +32,7 @@ function socketInit(socket: net.Socket): TCPConn {
     conn.reader = null;
   });
 
-  socket.on("ended", () => {
+  socket.on("end", () => {
     conn.ended = true;
 
     if (conn.reader) {
