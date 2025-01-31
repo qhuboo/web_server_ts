@@ -1,6 +1,11 @@
 import * as net from "node:net";
 import { Buffer } from "node:buffer";
-import { DynamicBuffer, bufferPush } from "./dynamicBuffer";
+import {
+  DynamicBuffer,
+  bufferPush,
+  cutMessage,
+  bufferPop,
+} from "./dynamicBuffer";
 
 let server = net.createServer({ pauseOnConnect: true });
 
@@ -103,7 +108,7 @@ async function newConn(socket: net.Socket): Promise<void> {
 
 async function serveClient(socket: net.Socket): Promise<void> {
   const conn: TCPConn = socketInit(socket);
-  const buffer: DynamicBuffer = { data: Buffer.alloc(0), length: 0 };
+  const buffer: DynamicBuffer = { data: Buffer.alloc(0), length: 0, start: 0 };
 
   while (true) {
     // Try to get 1 message from the buffer
@@ -125,24 +130,4 @@ async function serveClient(socket: net.Socket): Promise<void> {
       await socketWrite(conn, reply);
     }
   }
-}
-
-function cutMessage(buffer: DynamicBuffer): null | Buffer {
-  // messages are separated by '\n'
-  const idx = buffer.data.subarray(0, buffer.length).indexOf("\n");
-  if (idx < 0) {
-    return null;
-  }
-
-  // Make a copy of the message and move the remaining data to the front
-  const msg: Buffer = Buffer.from(buffer.data.subarray(0, idx + 1));
-  bufferPop(buffer, idx + 1);
-  return msg;
-}
-
-function bufferPop(buffer: DynamicBuffer, length: number): void {
-  // Move the remaining data to the front
-  buffer.data.copyWithin(0, length, buffer.length);
-  // Set the new buffer data length by subtracting the length of the message
-  buffer.length -= length;
 }
