@@ -21,6 +21,7 @@ type TCPConn = {
         reject: (reason: Error) => void;
     };
 };
+
 function socketInit(socket: net.Socket): TCPConn {
     const conn: TCPConn = {
         socket: socket,
