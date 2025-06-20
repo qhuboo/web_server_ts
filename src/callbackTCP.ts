@@ -15,7 +15,9 @@ function onConnection(socket: net.Socket): void {
 	console.log(socket);
 
 	socket.on("data", (data: Buffer) => {
+		console.log("We have data!");
 		console.log("data:", data);
+		console.log("data string: ", data.toString());
 		socket.write(data);
 
 		if (data.includes("q")) {
