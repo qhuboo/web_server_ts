@@ -11,6 +11,9 @@ server.on("error", (error: Error): never => {
 });
 
 function onConnection(socket: net.Socket): void {
+	console.log("We are connected!");
+	console.log(socket);
+
 	socket.on("data", (data: Buffer) => {
 		console.log("data:", data);
 		socket.write(data);
