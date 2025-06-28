@@ -12,9 +12,7 @@ server.on("error", (error: Error): never => {
 
 function onConnection(socket: net.Socket): void {
 	socket.on("data", (data: Buffer) => {
-		console.log("data:", data);
 		socket.write(data);
-
 		if (data.includes("q")) {
 			console.log("closing");
 			socket.end();

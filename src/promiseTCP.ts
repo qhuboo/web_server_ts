@@ -1,26 +1,11 @@
 import * as net from "node:net";
-import { Buffer } from "node:buffer";
-import {
-	DynamicBuffer,
-	bufferPush,
-	cutMessage,
-	bufferPop,
-} from "./dynamicBuffer";
+import { bufferPush, cutMessage } from "./dynamicBuffer";
+import { HTTPError } from "./errors";
 
 let server = net.createServer({ pauseOnConnect: true });
 
 server.listen({ host: "127.0.0.1", port: 1234 });
 server.on("connection", newConn);
-
-type TCPConn = {
-	socket: net.Socket;
-	error: null | Error;
-	ended: boolean;
-	reader: null | {
-		resolve: (value: Buffer) => void;
-		reject: (reason: Error) => void;
-	};
-};
 
 function socketInit(socket: net.Socket): TCPConn {
 	const conn: TCPConn = {
@@ -96,42 +81,47 @@ function socketWrite(conn: TCPConn, data: Buffer): Promise<void> {
 }
 
 async function newConn(socket: net.Socket): Promise<void> {
-	console.log("new connection", socket.remoteAddress, socket.remotePort);
+	const conn: TCPConn = socketInit(socket);
 	try {
-		await serveClient(socket);
+		await serveClient(conn);
 	} catch (error) {
-		console.log(error);
+		console.log("Error: ", error);
+		if (error instanceof HTTPError) {
+			// intended to send an error response
+			// const res: HTTPRes = {
+			//     code: error.code,
+			//     headers: [],
+			//     body: readerFromMemory(Buffer.from(error.message + "\n"));
+			// };
+			// try {
+			//     await writeHTTPRes(conn, res);
+			// } catch (error) {
+			//     console.log(error);
+			// }
+		}
 	} finally {
 		socket.destroy();
 	}
 }
 
-async function serveClient(socket: net.Socket): Promise<void> {
-	const conn: TCPConn = socketInit(socket);
+async function serveClient(conn: TCPConn): Promise<void> {
 	const buffer: DynamicBuffer = {
 		data: Buffer.alloc(0),
 		length: 0,
 		start: 0,
 	};
 
-	while (true) {
-		// Try to get 1 message from the buffer
-		const msg: null | Buffer = cutMessage(buffer);
+	let count = 0;
+	while (count < 10) {
+		count++;
+		// Try to get 1 request header from the buffer
+		const msg: null | HTTPReq = cutMessage(buffer);
 		if (!msg) {
+			console.log("Need more data");
 			const data: Buffer = await socketRead(conn);
 			bufferPush(buffer, data);
-
-			if (data.length === 0) {
-				console.log("end connection");
-				break;
-			}
-		} else if (msg.equals(Buffer.from("quit\n"))) {
-			await socketWrite(conn, Buffer.from("Bye.\n"));
-			socket.destroy();
-			return;
-		} else {
-			const reply = Buffer.concat([Buffer.from("Echo: "), msg]);
-			await socketWrite(conn, reply);
 		}
+
+		console.log("msg: ", msg);
 	}
 }
