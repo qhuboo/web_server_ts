@@ -41,7 +41,7 @@ export function cutMessage(buffer: DynamicBuffer): null | HTTPReq {
 	const bufferView = buffer.data.subarray(buffer.start, buffer.length);
 	const idx = bufferView.indexOf("\r\n\r\n");
 	if (idx < 0) {
-		if (buffer.length >= 1024 * 8) {
+		if (buffer.length - buffer.start >= 1024 * 8) {
 			throw new HTTPError(400, "Header is too large.");
 		}
 		return null;
@@ -55,12 +55,18 @@ export function cutMessage(buffer: DynamicBuffer): null | HTTPReq {
 	return msg;
 }
 
-export function bufferPop(buffer: DynamicBuffer): void {
+export function bufferPop(
+	buffer: DynamicBuffer,
+	amountToConsume: number
+): void {
 	console.log("In bufferPop");
-	// Move the remaining data to the front
-	buffer.data.copyWithin(0, buffer.start, buffer.length);
-	buffer.length = buffer.length - buffer.start;
-	buffer.start = 0;
+	buffer.start += amountToConsume;
+	// if (buffer.start > 512) {
+	// 	// Move the remaining data to the front
+	// 	buffer.data.copyWithin(0, buffer.start, buffer.length);
+	// 	buffer.length = buffer.length - buffer.start;
+	// 	buffer.start = 0;
+	// }
 }
 
 export function parseHTTPReq(data: Buffer): HTTPReq {
@@ -100,7 +106,6 @@ function splitLines(data: Buffer): Buffer[] {
 			start += idx + 2;
 		}
 	}
-	console.log("Lines: ", lines);
 	return lines;
 }
 
@@ -115,9 +120,33 @@ function parseRequestLine(data: Buffer): [string, Buffer, string] {
 	return [method, bufferUri, version];
 }
 
-function validateHeader(data: Buffer): boolean {
-	const string = data.toString();
-	return isValidHttpToken(string);
+export function fieldGet(headers: Buffer[], headerName: string) {
+	const headerLines = [];
+	for (const header of headers) {
+		const headerString = header.toString();
+		if (headerString.toLowerCase().startsWith(headerName.toLowerCase())) {
+			headerLines.push(headerString);
+		}
+	}
+	if (headerLines.length === 0) return null;
+
+	// Split and validate the header name/value
+	const colonIdx = headerLines[0].indexOf(":");
+	if (colonIdx === -1) return null;
+
+	const headerName_2 = headerLines[0].substring(0, colonIdx).trim();
+
+	const headerValue = headerLines[0].substring(colonIdx + 1).trim();
+
+	return Buffer.from(headerValue);
+}
+
+function validateHeaderName(data: string): boolean {
+	return isValidHttpToken(data);
+}
+
+function validateHeaderValue(data: string): boolean {
+	return !containsInvalidHeaderChar(data);
 }
 
 function isValidHttpToken(str: string) {
