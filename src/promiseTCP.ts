@@ -1,6 +1,7 @@
 import * as net from "node:net";
 import { bufferPush, cutMessage, fieldGet, bufferPop } from "./dynamicBuffer";
 import { HTTPError } from "./errors";
+import { resolve } from "node:path";
 
 let server = net.createServer({ pauseOnConnect: true, noDelay: true });
 
@@ -16,7 +17,7 @@ function socketInit(socket: net.Socket): TCPConn {
 	};
 
 	socket.on("data", (data: Buffer) => {
-		console.log("Data");
+		console.log("Data Event");
 		console.log("DATA: ", data);
 		console.log("DATA LEN: ", data.length);
 		console.assert(conn.reader);
@@ -137,6 +138,7 @@ async function serveClient(conn: TCPConn): Promise<void> {
 			console.log("********* Got Header Packet ********************");
 		} else {
 			console.log("Processing the request");
+			console.log(buffer);
 			// Process the message and send the response
 			const reqBody: BodyReader = readerFromReq(conn, buffer, msg);
 			console.log("reqBody: ", reqBody);
@@ -150,12 +152,16 @@ async function serveClient(conn: TCPConn): Promise<void> {
 	}
 }
 
-function readerFromReq(conn: TCPConn, buffer: DynamicBuffer, req: HTTPReq) {
+function readerFromReq(
+	conn: TCPConn,
+	buffer: DynamicBuffer,
+	req: HTTPReq
+): BodyReader {
 	console.log("In readerFromReq");
 	let bodyLen = -1;
 	const contentLen = fieldGet(req.headers, "Content-Length");
 	if (contentLen) {
-		bodyLen = parseDec(contentLen.toString("latin1"));
+		bodyLen = parseInt(contentLen.toString("latin1"));
 		if (isNaN(bodyLen)) {
 			throw new HTTPError(400, "bad Content-Length");
 		}
@@ -187,7 +193,7 @@ function readerFromReq(conn: TCPConn, buffer: DynamicBuffer, req: HTTPReq) {
 	} else if (chunked) {
 		console.log("Chunked encoding is present");
 		// Chunked encoding
-		throw new HTTPError(500, "TODO");
+		return readerFromGenerator(readChunks(conn, buffer));
 	} else {
 		console.log("Neither Content-Length or Chunked encoding is present");
 		// read the rest of the connection
@@ -206,6 +212,7 @@ function readerFromConnLength(
 		read: async (): Promise<Buffer> => {
 			console.log("In body.read");
 			if (remain === 0) {
+				console.log("No more data to read.");
 				return Buffer.from("");
 			}
 			if (buffer.length - buffer.start === 0) {
@@ -234,9 +241,104 @@ function readerFromConnLength(
 		},
 	};
 }
+function readerFromGenerator(gen: BufferGenerator): BodyReader {
+	return {
+		length: -1,
+		read: async (): Promise<Buffer> => {
+			const r = await gen.next();
+			if (r.done) {
+				return Buffer.from("");
+			} else {
+				console.assert(r.value.length > 0);
+				return r.value;
+			}
+		},
+	};
+}
 
-function parseDec(data: string): number {
-	return parseInt(data);
+function readerFromMemory(data: Buffer): BodyReader {
+	let done = false;
+	return {
+		length: data.length,
+		read: async (): Promise<Buffer> => {
+			if (done) {
+				return Buffer.from("");
+			} else {
+				done = true;
+				return data;
+			}
+		},
+	};
+}
+
+// Creates a buffer generator
+async function* readChunks(
+	conn: TCPConn,
+	buffer: DynamicBuffer
+): BufferGenerator {
+	for (let last = false; !last; ) {
+		console.log("In heo");
+		console.log(buffer);
+		// Read the chunk-size line
+		const idx = buffer.data
+			.subarray(buffer.start, buffer.length)
+			.indexOf("\r\n");
+		console.log("idx: ", idx);
+		if (idx < 0) {
+			console.log("We need more chunk size data");
+			// Need more data
+			const data = await socketRead(conn);
+			console.log("data: ", data);
+			bufferPush(buffer, data);
+			console.log(buffer);
+			continue;
+		}
+		// Parse the chunk-size and remove the line
+		console.log(
+			"current buffer: ",
+			buffer.data.subarray(buffer.start, buffer.start + idx)
+		);
+		console.log(buffer);
+		let remain = parseInt(
+			buffer.data.subarray(buffer.start, buffer.start + idx).toString("latin1"),
+			16
+		);
+		console.log("remain: ", remain);
+		bufferPop(buffer, idx + 2);
+		// Is this the last one?
+		last = remain === 0;
+		// Read and yield data
+		console.log("The new buffer: ", buffer);
+		while (remain > 0) {
+			console.log("We are now getting the actual data chunk");
+			if (buffer.length - buffer.start === 0) {
+				// We still need more data
+				console.log("The buffer was empty, getting a chunk");
+				const data = await socketRead(conn);
+				bufferPush(buffer, data);
+				console.log("This is now the new buffer: ", buffer);
+			}
+
+			const consume = Math.min(remain, buffer.length);
+			console.log("consume: ", consume);
+			const data = Buffer.from(
+				buffer.data.subarray(buffer.start, buffer.start + consume)
+			);
+			console.log("the data we are gonna consume: ", data);
+			bufferPop(buffer, consume);
+			remain -= consume;
+			console.log("this is the final buffer: ", buffer);
+			console.log("the remain: ", remain);
+			yield data;
+		}
+		// The chunk data is followed by CRLF
+		console.log("we need to remove the crlf");
+		if (!last) {
+			console.log("We are popping");
+			bufferPop(buffer, 2);
+		}
+		console.log("THE FINAL BUFFER: ", buffer);
+	}
 }
 
 async function handleReq(req: HTTPReq, body: BodyReader): Promise<HTTPRes> {
@@ -258,39 +360,36 @@ async function handleReq(req: HTTPReq, body: BodyReader): Promise<HTTPRes> {
 	};
 }
 
-function readerFromMemory(data: Buffer): BodyReader {
-	let done = false;
-	return {
-		length: data.length,
-		read: async (): Promise<Buffer> => {
-			if (done) {
-				return Buffer.from("");
-			} else {
-				done = true;
-				return data;
-			}
-		},
-	};
-}
-
 // Send an HTTP response through the socket
 async function writeHTTPRes(conn: TCPConn, response: HTTPRes): Promise<void> {
+	// Set the "Content-Length" or "Transfer-Encoding" field
 	if (response.body.length < 0) {
-		throw new Error("TODO: chunked encoding");
+		response.headers.push(Buffer.from("Transfer-Encoding: chunked"));
+	} else {
+		response.headers.push(
+			Buffer.from(`Content-Length: ${response.body.length}`)
+		);
 	}
-	// Set the "Content-Length" field
-	console.assert(!fieldGet(response.headers, "Content-Length"));
-	response.headers.push(Buffer.from(`Content-Length: ${response.body.length}`));
 	// Write the headers
 	await socketWrite(conn, encodeHTTPRes(response));
 	// Write the body
-	while (true) {
-		console.log("write");
-		const data = await response.body.read();
-		if (data.length === 0) {
-			break;
+	const crlf = Buffer.from("\r\n");
+	for (let last = false; !last; ) {
+		let data = await response.body.read();
+		last = data.length === 0;
+		// Chunked encoding ?
+		if (response.body.length < 0) {
+			console.log("We are here");
+			data = Buffer.concat([
+				Buffer.from(data.length.toString(16)),
+				crlf,
+				data,
+				crlf,
+			]);
 		}
-		await socketWrite(conn, data);
+		if (data.length) {
+			await socketWrite(conn, data);
+		}
 	}
 }
 

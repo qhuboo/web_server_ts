@@ -41,6 +41,8 @@ declare global {
 		| "OPTIONS"
 		| "POST"
 		| "PUT";
+
+	type BufferGenerator = AsyncGenerator<Buffer, void, void>;
 }
 
 export {};
