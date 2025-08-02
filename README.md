@@ -3,6 +3,7 @@ Build Your Own Web Server From Scratch In Node.JS (Work in Progress)
 
 This repository serves as the accompanying codebase where I am following along with the book "Build Your Own Web Server From Scratch In Node.JS" by James Smith.
 
+**Disclaimer:** This is a personal learning project. The code is under active development and may be incomplete or not fully functional at any given time. It is not intended for production use.
 
 ### Progress Tracker: Table of Contents
 
