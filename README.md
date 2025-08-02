@@ -25,14 +25,13 @@ This repository serves as the accompanying codebase where I am following along w
 
 ---
 
-The aim is to progress incrementally:
 
-1.  **Basic TCP Server:** Start with establishing and managing raw TCP connections.
-2.  **Promisified I/O:** Transform callback-based Node.js `net.Socket` operations into a more manageable, asynchronous Promise-based API.
-3.  **HTTP/1.1 Protocol Implementation:** Manually parse and serialize HTTP requests and responses, including:
+1.  Basic TCP Server: Start with establishing and managing raw TCP connections.
+2.  Promisified I/O: Transform callback-based Node.js `net.Socket` operations into a more manageable, asynchronous Promise-based API.
+3.  HTTP/1.1 Protocol Implementation: Manually parse and serialize HTTP requests and responses, including:
     *   Request line and headers.
     *   Handling `Content-Length`.
     *   Implementing `Transfer-Encoding: chunked`.
     *   Basic routing (e.g., an `/echo` endpoint).
-4.  **WebSocket Protocol Implementation:** Implement the WebSocket handshake and frame protocol for real-time bidirectional communication.
-5.  **Error Handling & Edge Cases:** Develop robust error handling and consider various edge cases in network communication.
+4.  WebSocket Protocol Implementation: Implement the WebSocket handshake and frame protocol for real-time bidirectional communication.
+5.  Error Handling & Edge Cases: Develop robust error handling and consider various edge cases in network communication.
