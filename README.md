@@ -25,8 +25,6 @@ This repository serves as the accompanying codebase where I am following along w
 
 ---
 
-## Project Goal & Learning Focus
-
 The aim is to progress incrementally:
 
 1.  **Basic TCP Server:** Start with establishing and managing raw TCP connections.
