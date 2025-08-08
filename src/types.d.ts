@@ -31,6 +31,7 @@ declare global {
 	type BodyReader = {
 		length: number;
 		read: () => Promise<Buffer>;
+		close?: () => Promise<void>;
 	};
 
 	type HTTPMethod =

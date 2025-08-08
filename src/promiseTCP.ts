@@ -144,7 +144,11 @@ async function serveClient(conn: TCPConn): Promise<void> {
 			console.log("reqBody: ", reqBody);
 			const response: HTTPRes = await handleReq(msg, reqBody);
 			console.log("response: ", response);
-			await writeHTTPRes(conn, response);
+			try {
+				await writeHTTPRes(conn, response);
+			} finally {
+				await response.body.close?.();
+			}
 		}
 		console.log(
 			"**************************End***************************************"
@@ -394,7 +398,7 @@ async function writeHTTPRes(conn: TCPConn, response: HTTPRes): Promise<void> {
 }
 
 function encodeHTTPRes(response: HTTPRes) {
-	const headerLines = [];
+	const headerLines: Buffer[] = [];
 
 	headerLines.push(Buffer.from(`HTTP/1.1 ${response.code} OK`));
 	for (const header of response.headers) {
