@@ -4,7 +4,7 @@
 	"description": "Going through the \"Build Your Own Web Server from Scratch in Node.JS\" book by James Smith.",
 	"main": "index.js",
 	"scripts": {
-		"dev": "nodemon -x ts-node src/promiseTCP.ts",
+		"dev": "nodemon -x ts-node --files src/promiseTCP.ts",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Jose Lopez Renteria",
